@@ -3,41 +3,37 @@ package course.concurrency.m3_shared.immutable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class OrderService {
 
-    private Map<Long, Order> currentOrders = new HashMap<>();
-    private long nextId = 0L;
+    private final Map<Long, Order> currentOrders = new ConcurrentHashMap<>();
+    private final AtomicLong nextId = new AtomicLong();
 
-    private synchronized long nextId() {
-        return nextId++;
+    public long createOrder(List<Item> items) {
+        Order order = Order.create(nextId.incrementAndGet(), items);
+        currentOrders.put(order.getId(), order);
+        return order.getId();
     }
 
-    public synchronized long createOrder(List<Item> items) {
-        long id = nextId();
-        Order order = new Order(items);
-        order.setId(id);
-        currentOrders.put(id, order);
-        return id;
-    }
-
-    public synchronized void updatePaymentInfo(long orderId, PaymentInfo paymentInfo) {
-        currentOrders.get(orderId).setPaymentInfo(paymentInfo);
-        if (currentOrders.get(orderId).checkStatus()) {
-            deliver(currentOrders.get(orderId));
+    public void updatePaymentInfo(long orderId, PaymentInfo paymentInfo) {
+        Order updateOrder = currentOrders.compute(orderId, (k, v) -> Order.updatePaymentInfo(v, paymentInfo));
+        if (Objects.nonNull(updateOrder) && updateOrder.checkStatus()) {
+            deliver(updateOrder);
         }
     }
 
-    public synchronized void setPacked(long orderId) {
-        currentOrders.get(orderId).setPacked(true);
-        if (currentOrders.get(orderId).checkStatus()) {
-            deliver(currentOrders.get(orderId));
+    public void setPacked(long orderId) {
+        Order packedOrder = currentOrders.compute(orderId, (k, v) -> Order.packed(v));
+        if (Objects.nonNull(packedOrder) && packedOrder.checkStatus()) {
+            deliver(packedOrder);
         }
     }
 
-    private synchronized void deliver(Order order) {
-        /* ... */
-        currentOrders.get(order.getId()).setStatus(Order.Status.DELIVERED);
+    private void deliver(Order order) {
+        currentOrders.compute(order.getId(), (k, v) -> Order.delivered(v));
     }
 
     public synchronized boolean isDelivered(long orderId) {

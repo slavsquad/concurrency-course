@@ -8,6 +8,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
+import java.util.stream.IntStream;
 
 public class ReportServiceCF {
 
@@ -23,6 +24,9 @@ public class ReportServiceCF {
 
         CompletableFuture<Collection<Others.Customer>> customersCF =
                 CompletableFuture.supplyAsync(() -> getActiveCustomers(), executor);
+
+        ForkJoinPool forkJoinPool = new ForkJoinPool(4);
+        forkJoinPool.submit(() -> System.out.println(IntStream.range(0,10000000).average().getAsDouble())).jo;
 
         CompletableFuture<Others.Report> reportTask =
                 customersCF.thenCombine(itemsCF,
